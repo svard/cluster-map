@@ -30,7 +30,7 @@
       (Socket. host port)
       (catch ConnectException ex
         (if (seq (rest hosts))
-          (create-socket (rest hosts))
+          (connect-cluster (rest hosts))
           (throw ex))))))
 
 (defn- parse [resp]
