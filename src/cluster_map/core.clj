@@ -5,23 +5,26 @@
 
 (defprotocol IConnection
   (is-open? [conn])
-  (request [conn request])
-  (read-response [conn])
   (close [conn]))
 
-(defrecord Connection [socket in out]
+(defprotocol ICommunicate
+  (request [comm request])
+  (read-response [comm]))
+
+(defrecord Connection [socket in out open?]
   IConnection
-  (is-open? [conn]
-    @(:open? (meta conn)))
+  (is-open? [_]
+    @open?)
+  (close [_]
+    (reset! open? false)
+    (.close in)
+    (.close out))
+  ICommunicate
   (request [_ request]
     (.println out request)
     (.flush out))
   (read-response [_]
-    (.readLine in))
-  (close [conn]
-    (reset! (:open? (meta conn)) false)
-    (.close in)
-    (.close out)))
+    (.readLine in)))
 
 (defn- connect-cluster [hosts]
   (let [host (:host (first hosts))
@@ -47,7 +50,7 @@
   (let [socket (connect-cluster hosts)
         in (BufferedReader. (InputStreamReader. (.getInputStream socket)))
         out (PrintWriter. (.getOutputStream socket))]
-    (Connection. socket in out {:open? (atom true)} {})))
+    (->Connection socket in out (atom true))))
 
 (defn create-db [conn db]
   (request conn (str "CREATE " db))
@@ -62,20 +65,22 @@
       (verify)))
 
 (defn put-val [conn db key value]
-  (if (keyword? key)
-    (request conn (str "PUT " db " " (name key) " " value))
-    (request conn (str "PUT " db " " key " " value)))
-  (-> (read-response conn)
-      (string/split #" " 2)
-      (verify)))
+  (let [serialized (pr-str value)]
+    (if (keyword? key)
+      (request conn (str "PUT " db " " (name key) " " value))
+      (request conn (str "PUT " db " " key " " value)))
+    (-> (read-response conn)
+        (string/split #" " 2)
+        (verify))))
 
 (defn get-val [conn db key]
   (if (keyword? key)
     (request conn (str "GET " db " " (name key)))
     (request conn (str "GET " db " " key)))
-  (-> (read-response conn)
-      (string/split #" " 2)
-      (parse)))
+  (when-let [response (-> (read-response conn)
+                          (string/split #" " 2)
+                          (parse))]
+    (read-string response)))
 
 (defn delete-val [conn db key]
   (if (keyword? key)
@@ -85,7 +90,7 @@
       (string/split #" " 2)
       (verify)))
 
-(defn make-transient [conn db]
+(defn cluster-map [conn db]
   (reify
     clojure.lang.ILookup
     (valAt [this k]
