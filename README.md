@@ -14,7 +14,7 @@ Connect to cluster and create a store
 Create a clustered transient map
 
 ```clojure
-(def cluster (make-transient conn "store"))
+(def cluster (cluster-map conn "store"))
 
 (assoc! cluster :key1 123 :key2 321)
 
