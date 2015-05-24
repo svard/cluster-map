@@ -90,6 +90,13 @@
       (string/split #" " 2)
       (verify)))
 
+(defn exist? [conn db]
+  (request conn (str "EXIST " db))
+  (when-let [response (-> (read-response conn)
+                          (string/split #" " 2)
+                          (parse))]
+    (read-string response)))
+
 (defn cluster-map [conn db]
   (reify
     clojure.lang.ILookup
@@ -105,3 +112,10 @@
     (without [this k]
       (when (delete-val conn db k)
         this))))
+
+(defmacro with-connection [binding & body]
+  `(let ~binding
+     (try
+       (do ~@body)
+       (finally
+         (close ~(binding 0))))))
