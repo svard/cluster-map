@@ -52,11 +52,18 @@
         out (PrintWriter. (.getOutputStream socket))]
     (->Connection socket in out (atom true))))
 
-(defn create-db [conn db]
-  (request conn (str "CREATE " db))
-  (-> (read-response conn)
-      (string/split #" " 2)
-      (verify)))
+(defn create-db
+  ([conn db]
+   (request conn (str "CREATE " db))
+   (-> (read-response conn)
+       (string/split #" " 2)
+       (verify)))
+  
+  ([conn db expire]
+   (request conn (str "CREATE " db " " expire))
+   (-> (read-response conn)
+       (string/split #" " 2)
+       (verify))))
 
 (defn drop-db [conn db]
   (request conn (str "DROP " db))
