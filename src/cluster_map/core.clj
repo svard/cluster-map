@@ -1,30 +1,11 @@
 (ns cluster-map.core
-  (:require [clojure.string :as string])
+  (:require [clojure.string :as string]
+            [cluster-map.comm :as comm]
+            [schema.core :as s])
   (:import [java.net Socket ConnectException]
            [java.io PrintWriter InputStreamReader BufferedReader]))
 
-(defprotocol IConnection
-  (is-open? [conn])
-  (close [conn]))
-
-(defprotocol ICommunicate
-  (request [comm request])
-  (read-response [comm]))
-
-(defrecord Connection [socket in out open?]
-  IConnection
-  (is-open? [_]
-    @open?)
-  (close [_]
-    (reset! open? false)
-    (.close in)
-    (.close out))
-  ICommunicate
-  (request [_ request]
-    (.println out request)
-    (.flush out))
-  (read-response [_]
-    (.readLine in)))
+(defrecord Connection [socket in out open?])
 
 (defn- connect-cluster [hosts]
   (let [host (:host (first hosts))
@@ -46,50 +27,55 @@
     "OK" true
     "NOK" false))
 
-(defn connect [hosts]
+(s/defn connect :- Connection
+  [hosts :- [{:host s/Str :port s/Int}]]
   (let [socket (connect-cluster hosts)
         in (BufferedReader. (InputStreamReader. (.getInputStream socket)))
         out (PrintWriter. (.getOutputStream socket))]
     (->Connection socket in out (atom true))))
 
-(defn create-db
-  ([conn db]
-   (request conn (str "CREATE " db))
-   (-> (read-response conn)
+(s/defn create-db :- s/Bool
+  ([conn :- Connection db :- s/Str]
+   (comm/request conn (str "CREATE " db))
+   (-> (comm/read-response conn)
        (string/split #" " 2)
        (verify)))
   
-  ([conn db expire]
-   (request conn (str "CREATE " db " " expire))
-   (-> (read-response conn)
+  ([conn :- Connection db :- s/Str expire :- s/Int]
+   (comm/request conn (str "CREATE " db " " expire))
+   (-> (comm/read-response conn)
        (string/split #" " 2)
        (verify))))
 
-(defn drop-db [conn db]
-  (request conn (str "DROP " db))
-  (-> (read-response conn)
+(s/defn drop-db :- s/Bool
+  [conn :- Connection db :- s/Str]
+  (comm/request conn (str "DROP " db))
+  (-> (comm/read-response conn)
       (string/split #" " 2)
       (verify)))
 
-(defn put-val [conn db key value]
+(s/defn put-val :- s/Bool
+  [conn :- Connection db :- s/Str key :- s/Any value :- s/Any]
   (let [serialized (pr-str value)]
     (if (keyword? key)
-      (request conn (str "PUT " db " " (name key) " " value))
-      (request conn (str "PUT " db " " key " " value)))
-    (-> (read-response conn)
+      (comm/request conn (str "PUT " db " " (name key) " " value))
+      (comm/request conn (str "PUT " db " " key " " value)))
+    (-> (comm/read-response conn)
         (string/split #" " 2)
         (verify))))
 
-(defn get-val [conn db key]
+(s/defn get-val :- s/Any
+  [conn :- Connection db :- s/Str key :- s/Any]
   (if (keyword? key)
-    (request conn (str "GET " db " " (name key)))
-    (request conn (str "GET " db " " key)))
-  (when-let [response (-> (read-response conn)
+    (comm/request conn (str "GET " db " " (name key)))
+    (comm/request conn (str "GET " db " " key)))
+  (when-let [response (-> (comm/read-response conn)
                           (string/split #" " 2)
                           (parse))]
     (read-string response)))
 
-(defn delete-val [conn db key]
+(s/defn delete-val :- s/Bool
+  [conn :- Connection db :- s/Str key :- s/Any]
   (if (keyword? key)
     (request conn (str "DELETE " db " " (name key)))
     (request conn (str "DELETE " db " " key)))
@@ -97,9 +83,10 @@
       (string/split #" " 2)
       (verify)))
 
-(defn exist? [conn db]
-  (request conn (str "EXIST " db))
-  (when-let [response (-> (read-response conn)
+(s/defn exist? :- s/Bool
+  [conn :- Connection db :- s/Str]
+  (comm/request conn (str "EXIST " db))
+  (when-let [response (-> (comm/read-response conn)
                           (string/split #" " 2)
                           (parse))]
     (read-string response)))
@@ -125,4 +112,9 @@
      (try
        (do ~@body)
        (finally
-         (close ~(binding 0))))))
+         (comm/close ~(binding 0))))))
+
+(comment
+  (defmacro defcluster [name [hosts db]]
+    `(def ~name (-> (connect ~hosts)
+                    (cluster-map ~db)))))
