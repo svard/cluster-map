@@ -1,16 +1,16 @@
 (ns cluster-map.comm)
 
-(defn request [conn req]
-  (.println (:out conn) req)
-  (.flush (:out conn)))
+(defn request [{:keys [out] :as conn} req]
+  (.println out req)
+  (.flush out))
 
-(defn read-response [conn]
-  (.readLine (:in conn)))
+(defn read-response [{:keys [in] :as conn}]
+  (.readLine in))
 
-(defn close [conn]
+(defn close [{:keys [in out] :as conn}]
   (reset! (:open? conn) false)
-  (.close (:in conn))
-  (.close (:out conn)))
+  (.close in)
+  (.close out))
 
-(defn is-open? [conn]
-  @(:open? conn))
+(defn is-open? [{:keys [open?] :as conn}]
+  @open?)
