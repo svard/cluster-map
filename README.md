@@ -7,7 +7,7 @@ Clojure bindings for distrib_db.
 Connect to cluster and create a store
 
 ```clojure
-(def conn (connect [{:host "192.168.0.1" :port 4040} {:host "192.168.0.2" :port 4040}]))
+(def conn (connect {:host "192.168.0.1" :port 4040} {:host "192.168.0.2" :port 4040}))
 
 (create-db conn "store")
 ```
