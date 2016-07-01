@@ -3,7 +3,7 @@
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.9.0-alpha7"]]
+  :dependencies [[org.clojure/clojure "1.9.0-alpha8"]]
 
   :plugins [[cider/cider-nrepl "0.12.0"]]
 

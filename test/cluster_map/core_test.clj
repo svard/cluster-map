@@ -2,9 +2,10 @@
   (:require [clojure.test :refer :all]
             [cluster-map.core :refer [with-connection] :as cm]
             [cluster-map.comm :as comm]
-            [cluster-map.spec]))
+            [cluster-map.spec]
+            [clojure.spec.test]))
 
-((resolve 'clojure.spec/instrument-ns) 'cluster-map.core)
+((resolve 'clojure.spec.test/instrument) 'cluster-map.core)
 
 (def test-server {:hostname "192.168.0.187" :port 4040})
 (def test-db (str "test-db"))
